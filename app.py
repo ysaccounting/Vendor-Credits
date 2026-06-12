@@ -25,6 +25,7 @@ import re
 import time
 import uuid
 import shutil
+import zipfile
 import calendar
 import tempfile
 import datetime as dt
@@ -923,6 +924,7 @@ def process():
     _cleanup_old()
     meta["download_url"] = f"/download/{token}"
     meta["download_vc_url"] = f"/download/{token}?which=vc"
+    meta["download_both_url"] = f"/download/{token}?which=both"
     meta["filename"] = fn_all
     meta["filename_vc"] = fn_vc
     return jsonify(meta)
@@ -936,6 +938,18 @@ def download(token):
     xlsx = [f for f in os.listdir(folder) if f.lower().endswith(".xlsx")]
     if not xlsx:
         abort(404)
+
+    if request.args.get("which") == "both":
+        full = next((f for f in xlsx if "(QBO)" not in f), xlsx[0])
+        zipname = re.sub(r"\.xlsx$", ".zip", full, flags=re.I)
+        mem = io.BytesIO()
+        with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as z:
+            for f in xlsx:
+                z.write(os.path.join(folder, f), arcname=f)
+        mem.seek(0)
+        return send_file(mem, mimetype="application/zip",
+                         as_attachment=True, download_name=zipname)
+
     want_vc = request.args.get("which") == "vc"
     vc_files = [f for f in xlsx if "(QBO)" in f]
     if want_vc:
