@@ -33,11 +33,6 @@
   .file-pill .remove { margin-left: auto; cursor: pointer; color: #9CA3AF; background: none; border: none;
     font-size: 1rem; line-height: 1; padding: 0 2px; }
   .file-pill .remove:hover { color: #374151; }
-  .date-row { margin-top: 1.3rem; display: flex; align-items: center; gap: .75rem; }
-  .date-row label { font-size: .8rem; color: #374151; font-weight: 500; white-space: nowrap; }
-  .date-row input[type="date"] { font-family: inherit; font-size: .85rem; color: #374151; padding: .45rem .6rem;
-    border: 1px solid #D1D5DB; border-radius: 7px; background: #fff; }
-  .date-row .hint { font-size: .74rem; color: #9CA3AF; }
   .actions { display: flex; gap: .75rem; margin-top: 1.5rem; }
   .btn-process { flex: 1; background: #4B5563; color: #fff; border: none; border-radius: 8px; padding: .7rem 1.25rem;
     font-family: inherit; font-weight: 600; font-size: .9rem; cursor: pointer; display: flex; align-items: center;
@@ -79,7 +74,7 @@
 <div class="card">
   <div class="card-body">
     <div class="card-title">Vendor Credits</div>
-    <div class="card-sub">Upload the QuickBooks <strong>Balance Sheet</strong> and <strong>A/P Aging Summary</strong> exports. The app matches each team's ticket credits against its accounts payable and builds the workbook with three tabs &mdash; Vendor Credits, Other TC, and Other AP.</div>
+    <div class="card-sub">Upload the month-end QBO balance sheet and A/P aging summary reports to generate the vendor credit upload file needed for QBO.</div>
 
     <div class="section-label">Balance Sheet</div>
     <div class="dropzone" id="dzBalance" data-key="balance_sheet">
@@ -96,12 +91,6 @@
       <div class="dropzone-hint">QuickBooks A/P Aging Summary export &middot; .xlsx / .xlsm / .csv</div>
     </div>
     <div class="file-list" id="listAging"></div>
-
-    <div class="date-row">
-      <label for="monthEnd">Month-end date</label>
-      <input type="date" id="monthEnd">
-      <span class="hint">optional &mdash; auto-detected from the reports</span>
-    </div>
 
     <div class="actions">
       <button class="btn-process" id="processBtn" disabled>
@@ -160,7 +149,6 @@
   document.getElementById('clearBtn').addEventListener('click', () => {
     store.balance_sheet = []; store.ap_aging = [];
     render('balance_sheet'); render('ap_aging');
-    document.getElementById('monthEnd').value = '';
     resultsDiv.style.display = 'none'; resultsDiv.innerHTML = '';
   });
 
@@ -172,8 +160,6 @@
     const fd = new FormData();
     fd.append('balance_sheet', store.balance_sheet[0]);
     fd.append('ap_aging', store.ap_aging[0]);
-    const md = document.getElementById('monthEnd').value;
-    if (md) fd.append('month_end', md);
 
     try {
       const resp = await fetch('/process', { method: 'POST', body: fd });
