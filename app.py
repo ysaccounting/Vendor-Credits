@@ -293,6 +293,14 @@ def _sport_ok(a, b):
     return not (a and b and a != b)
 
 
+def _sport_of_label(label):
+    """Sport word implied by a group-header label (e.g. NCAA 'Basketball'), else None."""
+    for t in _tokens(label):
+        if t in SPORTS:
+            return t
+    return None
+
+
 def match_credits_to_ap(teams, ap_list):
     """Assign an A/P record to each ticket-credit team.
 
@@ -307,8 +315,10 @@ def match_credits_to_ap(teams, ap_list):
     team_idx = [-1] * len(teams)
     notes = []
 
-    def candidates(tname):
-        tcore, tsport = _key(tname)
+    def candidates(t):
+        tname = t["Vendor"]
+        tcore, name_sport = _key(tname)
+        tsport = name_sport or t.get("hier_sport")   # fall back to NCAA group sport
         talias = _ALIAS_GROUP.get(_alias_norm(tname))
         alias_hits, exact_hits, subset_hits = [], [], []
         for j, a in enumerate(ap_list):
@@ -331,7 +341,7 @@ def match_credits_to_ap(teams, ap_list):
         return None, []
 
     for i, t in enumerate(teams):
-        tier, hits = candidates(t["Vendor"])
+        tier, hits = candidates(t)
         if len(hits) == 1:
             j = hits[0]
             used.add(j)
@@ -429,6 +439,7 @@ def parse_balance_sheet(rows):
 
     items = []
     skip_ind = None
+    header_stack = []                             # (indent, sport_or_None) of open headers
     for i, (nm, ind, amt) in enumerate(section):
         if skip_ind is not None:
             if ind > skip_ind:
@@ -439,17 +450,22 @@ def parse_balance_sheet(rows):
         if _norm_group(nm) in EXCLUDED_GROUPS:
             skip_ind = ind
             continue
+        while header_stack and header_stack[-1][0] >= ind:
+            header_stack.pop()                    # close headers at same/deeper indent
         next_ind = section[i + 1][1] if i + 1 < len(section) else parent_ind
         if next_ind > ind:                        # has children -> group header
             label = re.sub(r"\s*\(tc\)\s*$", "", nm, flags=re.I).strip()
+            header_stack.append((ind, _sport_of_label(label)))
             items.append({"kind": "header", "ind": ind, "Vendor": label})
         else:                                     # leaf account -> team
             if _norm(nm).endswith("(tc)"):
                 vendor = re.sub(r"\s*\(tc\)\s*$", "", nm, flags=re.I).strip()
             else:
                 vendor = nm
+            hier_sport = next((s for (_, s) in reversed(header_stack) if s), None)
             items.append({"kind": "team", "ind": ind, "Vendor": vendor,
-                          "Expense Account": nm, "Ticket Credit Amount": amt})
+                          "Expense Account": nm, "Ticket Credit Amount": amt,
+                          "hier_sport": hier_sport})
     return items, _find_asof(rows)
 
 
